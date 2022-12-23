@@ -5,6 +5,7 @@
 #include <ompl/geometric/planners/rrt/RRTConnect.h>
 #include <ompl/tools/lightning/LightningDB.h>
 #include <experience/ERT.h>
+#include <experience/ERTConnect.h>
 
 #include <chrono>
 #include <memory>
@@ -16,8 +17,7 @@ namespace ot = ompl::tools;
 using namespace std::chrono;
 
 
-int main(){
-  // create planner for 2d square space
+og::SimpleSetupPtr create_setup(){
   const auto space(std::make_shared<ob::RealVectorStateSpace>());
   space->addDimension(0.0, 1.0);
   space->addDimension(0.0, 1.0);
@@ -28,77 +28,85 @@ int main(){
     const auto x = (rs->values[0] - 0.5);
     const auto y = (rs->values[1] - 0.5);
     const double r = 0.43;
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    // NOTE: to compare performance, the sleep is injected intentionaly
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
     return (x * x + y * y) > (r * r);
   };
 
-  const auto setup_rrt = std::make_unique<og::SimpleSetup>(si);
-  setup_rrt->setStateValidityChecker(isValid);
+  const auto setup = std::make_shared<og::SimpleSetup>(si);
+  setup->setStateValidityChecker(isValid);
+  return setup;
+}
+
+ot::LightningDBPtr create_database(og::SimpleSetupPtr setup, const int n_data, double& time_per_problem){
+  const auto si = setup->getSpaceInformation();
   const auto algo = std::make_shared<og::RRTConnect>(si);
-  setup_rrt->setPlanner(algo);
+  setup->setPlanner(algo);
 
   // create many example data
-  std::vector<std::vector<ob::State*>> experiences;
 
-  auto database = ot::LightningDB(space);
+  auto database = std::make_shared<ot::LightningDB>(si->getStateSpace());
 
   double time_sum_rrt = 0.0;
-  for(size_t i = 0; i < 100; ++i){
-    setup_rrt->clear();
-    const auto valid_sampler = setup_rrt->getSpaceInformation()->allocValidStateSampler();
-    ob::ScopedState<> start(setup_rrt->getStateSpace());
+  for(size_t i = 0; i < n_data; ++i){
+    setup->clear();
+    const auto valid_sampler = setup->getSpaceInformation()->allocValidStateSampler();
+    ob::ScopedState<> start(setup->getStateSpace());
     valid_sampler->sample(start.get());
-    ob::ScopedState<> goal(setup_rrt->getStateSpace());
+    ob::ScopedState<> goal(setup->getStateSpace());
     valid_sampler->sample(goal.get());
-    setup_rrt->setStartAndGoalStates(start, goal);
-    const auto result = setup_rrt->solve(1.0);
+    setup->setStartAndGoalStates(start, goal);
+    const auto result = setup->solve(1.0);
     const bool solved = result && result != ob::PlannerStatus::APPROXIMATE_SOLUTION;
     if(solved){
-      auto p = setup_rrt->getSolutionPath().as<og::PathGeometric>();
+      auto p = setup->getSolutionPath().as<og::PathGeometric>();
       double insertion_time;
-      database.addPath(*p, insertion_time);
-      const auto experience = p->getStates();
-      experiences.push_back(experience);
+      database->addPath(*p, insertion_time);
     }
-    time_sum_rrt += setup_rrt->getLastPlanComputationTime();
+    time_sum_rrt += setup->getLastPlanComputationTime();
   }
-  const double time_avrage_rrt = time_sum_rrt / 100.0;
+  time_per_problem = time_sum_rrt / (double)n_data;
+  return database;
+}
 
-  // create ert planning by setting many experiences
-  const auto ert_setup = std::make_unique<og::SimpleSetup>(si);
-  ert_setup->setStateValidityChecker(isValid);
-  const auto ert_planner = std::make_shared<og::ERT>(si);
 
-  const auto valid_sampler = ert_setup->getSpaceInformation()->allocValidStateSampler();
+int main(){
+  const auto setup = create_setup();
+  const auto si = setup->getSpaceInformation();
+
+  double rrt_time;
+  const auto database = create_database(setup, 1000, rrt_time);
+  const auto ert_planner = std::make_shared<og::ERTConnect>(si);
+
+  const auto valid_sampler = setup->getSpaceInformation()->allocValidStateSampler();
 
   double time_sum_ert = 0.0;
-  for(size_t i=0; i<30; ++i){
+  const double n_ert_trial = 300;
+  for(size_t i=0; i < n_ert_trial; ++i){
+    // define problem
     ert_planner->clear();
-    ob::ScopedState<> start(ert_setup->getStateSpace());
+    ob::ScopedState<> start(setup->getStateSpace());
     valid_sampler->sample(start.get());
-    ob::ScopedState<> goal(ert_setup->getStateSpace());
+    ob::ScopedState<> goal(setup->getStateSpace());
     valid_sampler->sample(goal.get());
-    auto start_ = start->as<ob::State>();
-    auto goal_ = goal->as<ob::State>();
-    const auto selected_path = database.findNearestStartGoal(1, start_, goal_).at(0);
 
-    const auto chosenPath = database.findNearestStartGoal(1, start_, goal_).at(0);
-
-    assert(chosenPath->numVertices() >= 2);
-
-    auto chosen_path_geometric(std::make_shared<og::PathGeometric>(si));
-    for (std::size_t i = 0; i < chosenPath->numVertices(); ++i)
+    // determine relevant path and set experience
+    const auto relevant_path = database->findNearestStartGoal(1, start->as<ob::State>(), goal->as<ob::State>()).at(0);
+    auto relevant_path_geometric(std::make_shared<og::PathGeometric>(si));
+    for (std::size_t i = 0; i < relevant_path->numVertices(); ++i)
     {
-        chosen_path_geometric->append(chosenPath->getVertex(i).getState());
+        relevant_path_geometric->append(relevant_path->getVertex(i).getState());
     }
-    const auto experience = chosen_path_geometric->getStates();
+    const auto experience = relevant_path_geometric->getStates();
+
+    // solve
     ert_planner->setExperience(experience);
-    ert_setup->setPlanner(ert_planner);
-    ert_setup->setStartAndGoalStates(start, goal);
-    ert_setup->solve(1.0);
-    time_sum_ert += ert_setup->getLastPlanComputationTime();
+    setup->setPlanner(ert_planner);
+    setup->setStartAndGoalStates(start, goal);
+    setup->solve(1.0);
+    time_sum_ert += setup->getLastPlanComputationTime();
   }
-  const double time_avrage_ert = time_sum_ert / 100.0;
-  std::cout << "rrt: " << time_avrage_rrt << std::endl;
-  std::cout << "ert: " << time_avrage_ert << std::endl;
+  const double ert_time = time_sum_ert / (double)n_ert_trial;
+  std::cout << "rrt-connect average solving time: " << rrt_time << std::endl;
+  std::cout << "ert-connect average solvign time: " << ert_time << std::endl;
 }
