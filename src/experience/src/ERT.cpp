@@ -34,7 +34,7 @@
 
 /* Author: Èric Pairet */
 
-#include "ompl/geometric/planners/experience/ERT.h"
+#include "experience/ERT.h"
 #include "ompl/base/goals/GoalSampleableRegion.h"
 #include "ompl/tools/config/SelfConfig.h"
 

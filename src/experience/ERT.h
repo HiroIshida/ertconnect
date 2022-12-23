@@ -37,7 +37,7 @@
 #ifndef OMPL_GEOMETRIC_PLANNERS_EXPERIENCE_ERT_
 #define OMPL_GEOMETRIC_PLANNERS_EXPERIENCE_ERT_
 
-#include "ompl/geometric/planners/experience/ert/PlannerData.h"
+#include "experience/ert/PlannerData.h"
 #include "ompl/geometric/planners/PlannerIncludes.h"
 #include "ompl/datastructures/NearestNeighbors.h"
 #include "ompl/datastructures/PDF.h"
