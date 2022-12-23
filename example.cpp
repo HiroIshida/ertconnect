@@ -76,8 +76,10 @@ int main(){
 
   double rrt_time;
   const auto database = create_database(setup, 1000, rrt_time);
-  const auto ert_planner = std::make_shared<og::ERTConnect>(si);
+  std::vector<ob::PlannerDataPtr> rawdata;
+  database->getAllPlannerDatas(rawdata);
 
+  const auto ert_planner = std::make_shared<og::ERTConnect>(si);
   const auto valid_sampler = setup->getSpaceInformation()->allocValidStateSampler();
 
   double time_sum_ert = 0.0;
@@ -92,6 +94,9 @@ int main(){
 
     // determine relevant path and set experience
     const auto relevant_path = database->findNearestStartGoal(1, start->as<ob::State>(), goal->as<ob::State>()).at(0);
+    const auto it = std::find(rawdata.begin(), rawdata.end(), relevant_path);
+    std::cout << "selected path index: " << it - rawdata.begin() << std::endl;
+
     auto relevant_path_geometric(std::make_shared<og::PathGeometric>(si));
     for (std::size_t i = 0; i < relevant_path->numVertices(); ++i)
     {
