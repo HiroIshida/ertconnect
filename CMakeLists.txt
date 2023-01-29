@@ -15,5 +15,8 @@ include_directories(src)
 add_library(ertconnect SHARED ${ERTTREE_SRC})
 target_link_libraries(ertconnect ${OMPL_LIBRARIES})
  
-add_executable(example example.cpp)
+add_executable(minimalistic_example minimalistic_example.cpp)
+target_link_libraries(example ${OMPL_LIBRARIES} ertconnect)
+
+add_executable(example updated_example.cpp)
 target_link_libraries(example ${OMPL_LIBRARIES} ertconnect)
