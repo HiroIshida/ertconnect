@@ -20,16 +20,18 @@ make -j4
 ```
 
 ## example
-The problem setup is quite simple: squared 2dim world with circle obstacle. To measure performance I conducted experiment, where trajectory library is constructed with 1000 trajectories using RRT-connect. Then solving ERT-connect for 300 time for different problem  with static environment. 
-```bash
-./build/example 
+./build/minimalistic_example
 ```
-The output is however shows the computation time of rrt-connect and ert-connect is almost the same. 
+Debug:   RRTConnect: Planner range detected to be 0.282843
+Info:    RRTConnect: Starting planning with 1 states already in datastructure
+Info:    RRTConnect: Created 24 states (12 start + 12 goal)
+Info:    Solution found in 0.094672 seconds
+rrt-connect average solving time: 0.0946724
+Info:    ERTConnect: Updated experience has 7 states
+Info:    ERTConnect: Updated experience solves the current problem defition!
+Info:    Solution found in 0.039897 seconds
+ert-connect average solvign time: 0.0398972
 ```
-rrt-connect average solving time: 0.0257019
-ert-connect average solvign time: 0.0251004
-```
-I think, the parameter tuning is required, or, probably my usage of the code is wrong.  Anyway, I should try and explorer more. 
 
 ## TODO
 add comparison with lightning [2] and thunder [3] planners.
@@ -38,5 +40,3 @@ add comparison with lightning [2] and thunder [3] planners.
 [1] Pairet, Èric, et al. "Path planning for manipulation using experience-driven random trees." IEEE Robotics and Automation Letters 6.2 (2021): 3295-3302.
 [2] Berenson, Dmitry, Pieter Abbeel, and Ken Goldberg. "A robot path planning framework that learns from experience." 2012 IEEE International Conference on Robotics and Automation. IEEE, 2012.
 [3] Coleman, David, et al. "Experience-based planning with sparse roadmap spanners." 2015 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2015.
-
-
