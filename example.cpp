@@ -16,6 +16,10 @@ namespace og = ompl::geometric;
 namespace ot = ompl::tools;
 using namespace std::chrono;
 
+std::random_device seed_gen;
+std::mt19937 engine(seed_gen());
+std::uniform_real_distribution<> uniform_dist(0.0, 1.0);
+
 
 og::SimpleSetupPtr create_setup(){
   const auto space(std::make_shared<ob::RealVectorStateSpace>());
@@ -52,9 +56,15 @@ ot::LightningDBPtr create_database(og::SimpleSetupPtr setup, const int n_data, d
     setup->clear();
     const auto valid_sampler = setup->getSpaceInformation()->allocValidStateSampler();
     ob::ScopedState<> start(setup->getStateSpace());
-    valid_sampler->sample(start.get());
     ob::ScopedState<> goal(setup->getStateSpace());
-    valid_sampler->sample(goal.get());
+
+    auto rs_start = start->as<ob::RealVectorStateSpace::StateType>();
+    auto rs_goal = goal->as<ob::RealVectorStateSpace::StateType>();
+    rs_start->values[0] = uniform_dist(engine) * 0.1;
+    rs_start->values[1] = uniform_dist(engine) * 0.1;
+    rs_goal->values[0] = 1.0 - uniform_dist(engine) * 0.1;
+    rs_goal->values[1] = 1.0 - uniform_dist(engine) * 0.1;
+
     setup->setStartAndGoalStates(start, goal);
     const auto result = setup->solve(1.0);
     const bool solved = result && result != ob::PlannerStatus::APPROXIMATE_SOLUTION;
@@ -73,9 +83,10 @@ ot::LightningDBPtr create_database(og::SimpleSetupPtr setup, const int n_data, d
 int main(){
   const auto setup = create_setup();
   const auto si = setup->getSpaceInformation();
+  si->setStateValidityCheckingResolution(0.005);
 
   double rrt_time;
-  const auto database = create_database(setup, 1000, rrt_time);
+  const auto database = create_database(setup, 100, rrt_time);
   std::vector<ob::PlannerDataPtr> rawdata;
   database->getAllPlannerDatas(rawdata);
 
@@ -83,14 +94,19 @@ int main(){
   const auto valid_sampler = setup->getSpaceInformation()->allocValidStateSampler();
 
   double time_sum_ert = 0.0;
-  const double n_ert_trial = 300;
+  const double n_ert_trial = 100;
   for(size_t i=0; i < n_ert_trial; ++i){
     // define problem
     ert_planner->clear();
     ob::ScopedState<> start(setup->getStateSpace());
-    valid_sampler->sample(start.get());
     ob::ScopedState<> goal(setup->getStateSpace());
-    valid_sampler->sample(goal.get());
+
+    auto rs_start = start->as<ob::RealVectorStateSpace::StateType>();
+    auto rs_goal = goal->as<ob::RealVectorStateSpace::StateType>();
+    rs_start->values[0] = uniform_dist(engine) * 0.1;
+    rs_start->values[1] = uniform_dist(engine) * 0.1;
+    rs_goal->values[0] = 1.0 - uniform_dist(engine) * 0.1;
+    rs_goal->values[1] = 1.0 - uniform_dist(engine) * 0.1;
 
     // determine relevant path and set experience
     const auto relevant_path = database->findNearestStartGoal(1, start->as<ob::State>(), goal->as<ob::State>()).at(0);
